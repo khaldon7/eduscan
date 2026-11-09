@@ -133,12 +133,17 @@ function init() {
     renderer.render(scene, cam);
     requestAnimationFrame(frame);
   }
+  console.log("SCENE_OK " + meshes.length);
   frame();
 }
 if (typeof THREE === "undefined") {
   document.getElementById("msg").textContent = "تعذّر تحميل مكتبة الرسم داخل التطبيق.";
 } else {
-  init();
+  try {
+    init();
+  } catch (e) {
+    document.getElementById("msg").textContent = "خطأ في الرسم: " + e.message;
+  }
 }
 </script>
 </body>
