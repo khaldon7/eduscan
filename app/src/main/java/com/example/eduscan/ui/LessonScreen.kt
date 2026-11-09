@@ -1,6 +1,8 @@
 package com.example.eduscan.ui
 
 import android.graphics.BitmapFactory
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -8,6 +10,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,23 +20,54 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.example.eduscan.model.Hotspot
 import com.example.eduscan.model.Lesson
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LessonScreen(lesson: Lesson, onBack: () -> Unit) {
+    var tab by remember { mutableIntStateOf(0) }
+    val tabs = listOf("الدرس", "ثلاثي الأبعاد", "اختبار")
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(lesson.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "رجوع") }
+                }
+            )
+        }
+    ) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize()) {
+            TabRow(selectedTabIndex = tab) {
+                tabs.forEachIndexed { i, title ->
+                    Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) })
+                }
+            }
+            when (tab) {
+                0 -> LessonBody(lesson)
+                1 -> ModelTab(lesson)
+                else -> QuizTab(lesson)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LessonBody(lesson: Lesson) {
     var selected by remember { mutableStateOf<Hotspot?>(null) }
-    val answers = remember { mutableStateMapOf<Int, Int>() }
-    val bitmap = remember(lesson.imagePath) { BitmapFactory.decodeFile(lesson.imagePath)?.asImageBitmap() }
+    val bitmap = remember(lesson.imagePath) {
+        if (lesson.imagePath.isNotBlank()) BitmapFactory.decodeFile(lesson.imagePath)?.asImageBitmap() else null
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-        TextButton(onClick = onBack) { Text("رجوع") }
-        Text(lesson.title, style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(8.dp))
-
         bitmap?.let { img ->
-            Box(Modifier.fillMaxWidth().aspectRatio(img.width / img.height.toFloat())) {
+            Box(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).aspectRatio(img.width / img.height.toFloat())) {
                 Image(img, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     lesson.hotspots.forEach { h ->
@@ -41,45 +76,24 @@ fun LessonScreen(lesson: Lesson, onBack: () -> Unit) {
                                 .offset(x = maxWidth * h.x - 14.dp, y = maxHeight * h.y - 14.dp)
                                 .size(28.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xCCE24B4A))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f))
                                 .clickable { selected = h },
                             contentAlignment = Alignment.Center
                         ) { Text("i", color = Color.White, style = MaterialTheme.typography.labelSmall) }
                     }
                 }
             }
+            Spacer(Modifier.height(16.dp))
         }
 
-        Spacer(Modifier.height(16.dp))
-        if (lesson.summary.isNotBlank()) Text(lesson.summary)
+        if (lesson.summary.isNotBlank()) {
+            Text(lesson.summary, style = MaterialTheme.typography.bodyLarge)
+        }
         lesson.sections.forEach { s ->
-            Spacer(Modifier.height(12.dp))
-            Text(s.heading, style = MaterialTheme.typography.titleMedium)
-            Text(s.body)
-        }
-
-        if (lesson.quiz.isNotEmpty()) {
-            Spacer(Modifier.height(20.dp))
-            Text("اختبر نفسك", style = MaterialTheme.typography.titleLarge)
-        }
-        lesson.quiz.forEachIndexed { qi, q ->
-            Spacer(Modifier.height(10.dp))
-            Text(q.question)
-            q.options.forEachIndexed { oi, opt ->
-                Row(
-                    Modifier.fillMaxWidth().clickable { answers[qi] = oi },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(selected = answers[qi] == oi, onClick = null)
-                    Text(opt)
-                }
-            }
-            answers[qi]?.let { given ->
-                Text(
-                    if (given == q.answerIndex) "إجابة صحيحة" else "إجابة خاطئة",
-                    color = if (given == q.answerIndex) Color(0xFF1D9E75) else Color(0xFFA32D2D)
-                )
-            }
+            Spacer(Modifier.height(16.dp))
+            Text(s.heading, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(4.dp))
+            Text(s.body, style = MaterialTheme.typography.bodyMedium)
         }
     }
 
@@ -90,5 +104,72 @@ fun LessonScreen(lesson: Lesson, onBack: () -> Unit) {
             title = { Text(h.label) },
             text = { Text(h.explanation) }
         )
+    }
+}
+
+@Composable
+private fun ModelTab(lesson: Lesson) {
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        if (lesson.topic == "heart") {
+            AndroidView(
+                modifier = Modifier.fillMaxWidth().weight(1f).clip(MaterialTheme.shapes.large),
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        webViewClient = WebViewClient()
+                        setBackgroundColor(0)
+                        loadDataWithBaseURL(null, HeartModel.HTML, "text/html", "utf-8", null)
+                    }
+                }
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "اسحب للتدوير، واضغط على أي جزء لمعرفة وظيفته.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Text(
+                "لا يوجد نموذج ثلاثي الأبعاد لهذا الموضوع بعد.",
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuizTab(lesson: Lesson) {
+    val answers = remember { mutableStateMapOf<Int, Int>() }
+
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+        if (lesson.quiz.isEmpty()) {
+            Text("لا يوجد اختبار لهذا الدرس.", style = MaterialTheme.typography.bodyLarge)
+        }
+        lesson.quiz.forEachIndexed { qi, q ->
+            Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(q.question, style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(8.dp))
+                    q.options.forEachIndexed { oi, opt ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { answers[qi] = oi },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = answers[qi] == oi, onClick = null)
+                            Text(opt)
+                        }
+                    }
+                    answers[qi]?.let { given ->
+                        Spacer(Modifier.height(4.dp))
+                        val correct = given == q.answerIndex
+                        Text(
+                            if (correct) "إجابة صحيحة" else "إجابة خاطئة",
+                            color = if (correct) Color(0xFF1D9E75) else MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+            }
+        }
     }
 }
