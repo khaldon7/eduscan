@@ -8,7 +8,12 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+# قائمة النماذج بالترتيب، والخادم ينتقل للتالي عند نفاد الحصة أو الازدحام
+MODELS = [m.strip() for m in os.getenv(
+    "GEMINI_MODELS",
+    "gemini-2.5-flash,gemini-2.0-flash,gemini-flash-latest"
+).split(",") if m.strip()]
+
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 app = FastAPI()
 
@@ -49,19 +54,35 @@ def parse_json(text: str) -> dict:
     return json.loads(cleaned)
 
 
+def generate_with_fallback(image_bytes: bytes, mime_type: str) -> str:
+    last_error = None
+    for model in MODELS:
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=[
+                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                    PROMPT,
+                ],
+                config=types.GenerateContentConfig(response_mime_type="application/json"),
+            )
+            return response.text
+        except Exception as e:
+            last_error = e
+            message = str(e)
+            # ننتقل للنموذج التالي فقط عند نفاد الحصة أو الازدحام أو عدم توفر النموذج
+            if any(code in message for code in ("429", "503", "404", "RESOURCE_EXHAUSTED", "UNAVAILABLE", "NOT_FOUND")):
+                continue
+            raise
+    raise HTTPException(status_code=503, detail=f"جميع النماذج غير متاحة حالياً: {last_error}")
+
+
 @app.post("/analyze")
 def analyze(req: AnalyzeRequest):
     image_bytes = base64.b64decode(req.imageBase64)
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=[
-            types.Part.from_bytes(data=image_bytes, mime_type=req.mimeType),
-            PROMPT,
-        ],
-        config=types.GenerateContentConfig(response_mime_type="application/json"),
-    )
+    text = generate_with_fallback(image_bytes, req.mimeType)
     try:
-        data = parse_json(response.text)
+        data = parse_json(text)
     except (json.JSONDecodeError, TypeError):
         raise HTTPException(status_code=502, detail="الرد ليس JSON صالحاً")
     data.setdefault("scene", None)
