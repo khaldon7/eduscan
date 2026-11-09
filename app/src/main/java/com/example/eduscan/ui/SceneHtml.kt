@@ -20,11 +20,11 @@ object SceneHtml {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-html,body{margin:0;height:100%;overflow:hidden;background:transparent;font-family:sans-serif}
+html,body{margin:0;height:100%;overflow:hidden;background:#F5F4EF;font-family:sans-serif}
+canvas{display:block}
 #info{position:absolute;left:8px;right:8px;bottom:8px;background:rgba(255,255,255,.95);color:#222;padding:10px 14px;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.15);font-size:14px}
 #info b{font-size:16px}
 #msg{position:absolute;top:40%;width:100%;text-align:center;color:#888}
-@media (prefers-color-scheme: dark){#info{background:rgba(40,40,46,.95);color:#eee}}
 </style>
 </head>
 <body>
@@ -36,16 +36,20 @@ var SCENE = __SCENE__;
 function init() {
   document.getElementById("msg").remove();
   var W = innerWidth, H = innerHeight;
-  var renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+  var renderer = new THREE.WebGLRenderer({antialias: true});
   renderer.setPixelRatio(devicePixelRatio);
   renderer.setSize(W, H);
+  renderer.setClearColor(0xF5F4EF, 1);
   document.body.insertBefore(renderer.domElement, document.getElementById("info"));
+
   var scene = new THREE.Scene();
-  var cam = new THREE.PerspectiveCamera(40, W / H, 0.1, 200);
+  var cam = new THREE.PerspectiveCamera(40, W / H, 0.1, 500);
   scene.add(new THREE.AmbientLight(0xffffff, 0.6));
   var dl = new THREE.DirectionalLight(0xffffff, 0.8);
   dl.position.set(3, 5, 4);
   scene.add(dl);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 0.6));
+
   var group = new THREE.Group();
   scene.add(group);
 
@@ -84,7 +88,8 @@ function init() {
   var size = box.getSize(new THREE.Vector3());
   group.position.sub(center);
   var dim = Math.max(size.x, size.y, size.z, 1);
-  cam.position.set(0, 0, dim * 1.9 + 1.5);
+  cam.position.set(0, dim * 0.35, dim * 2.6 + 1.5);
+  cam.lookAt(0, 0, 0);
 
   var info = document.getElementById("info");
   var ray = new THREE.Raycaster(), ptr = new THREE.Vector2(), down = null;
