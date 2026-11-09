@@ -119,7 +119,6 @@ private fun ModelTab(lesson: Lesson) {
     val scene = lesson.scene
     var status by remember { mutableStateOf("جارٍ تحميل المشهد...") }
 
-    // مكتبة Three.js مضمّنة داخل التطبيق من assets/three.min.js
     val threeSource = remember {
         runCatching { context.assets.open("three.min.js").bufferedReader().use { it.readText() } }
             .getOrNull()
@@ -131,10 +130,7 @@ private fun ModelTab(lesson: Lesson) {
             return@Column
         }
         if (threeSource == null) {
-            Text(
-                "ملف مكتبة الرسم (three.min.js) غير موجود داخل التطبيق.",
-                color = MaterialTheme.colorScheme.error
-            )
+            Text("ملف مكتبة الرسم غير موجود داخل التطبيق.", color = MaterialTheme.colorScheme.error)
             return@Column
         }
 
@@ -151,33 +147,31 @@ private fun ModelTab(lesson: Lesson) {
             factory = { ctx ->
                 WebView(ctx).apply {
                     settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
                     setBackgroundColor(android.graphics.Color.TRANSPARENT)
                     webChromeClient = object : WebChromeClient() {
                         override fun onConsoleMessage(message: ConsoleMessage): Boolean {
-                            if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
-                                status = "خطأ في الصفحة: " + message.message()
+                            val text = message.message()
+                            status = when {
+                                text.startsWith("SCENE_OK") -> "تم تحميل المشهد"
+                                message.messageLevel() == ConsoleMessage.MessageLevel.ERROR ->
+                                    "خطأ في الرسم: $text"
+                                else -> status
                             }
                             return true
                         }
                     }
                     webViewClient = object : WebViewClient() {
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            if (status.startsWith("جارٍ")) status = "تم تحميل المشهد"
-                        }
                         override fun onReceivedError(
                             view: WebView?,
                             request: WebResourceRequest?,
                             error: WebResourceError?
                         ) {
-                            status = if (request?.isForMainFrame == true) {
-                                "تعذّر تحميل الصفحة: " + error?.description
-                            } else {
-                                "تعذّر تحميل جزء من الصفحة: " + error?.description
+                            if (request?.isForMainFrame == true) {
+                                status = "تعذّر تحميل الصفحة: " + error?.description
                             }
                         }
                     }
-                    loadDataWithBaseURL("https://eduscan.local/", html, "text/html", "utf-8", null)
+                    loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
                 }
             }
         )
