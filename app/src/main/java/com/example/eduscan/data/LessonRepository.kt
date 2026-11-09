@@ -12,11 +12,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.http.Body
 import retrofit2.http.POST
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 @Serializable
 data class AnalyzeRequest(val imageBase64: String, val mimeType: String = "image/jpeg")
@@ -29,8 +31,16 @@ interface AnalyzerApi {
 class LessonRepository(private val context: Context, private val dao: LessonDao) {
     private val json = Json { ignoreUnknownKeys = true }
 
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(120, TimeUnit.SECONDS)
+        .readTimeout(180, TimeUnit.SECONDS)
+        .callTimeout(240, TimeUnit.SECONDS)
+        .build()
+
     private val api: AnalyzerApi = Retrofit.Builder()
         .baseUrl(BuildConfig.BASE_URL)
+        .client(httpClient)
         .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
         .build()
         .create(AnalyzerApi::class.java)
