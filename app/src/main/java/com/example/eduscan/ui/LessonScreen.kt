@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -114,64 +115,78 @@ private fun LessonBody(lesson: Lesson) {
 
 @Composable
 private fun ModelTab(lesson: Lesson) {
+    val context = LocalContext.current
     val scene = lesson.scene
     var status by remember { mutableStateOf("جارٍ تحميل المشهد...") }
 
+    // مكتبة Three.js مضمّنة داخل التطبيق من assets/three.min.js
+    val threeSource = remember {
+        runCatching { context.assets.open("three.min.js").bufferedReader().use { it.readText() } }
+            .getOrNull()
+    }
+
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        if (scene != null && scene.objects.isNotEmpty()) {
-            val html = remember(lesson.id) { SceneHtml.build(scene) }
-            Text(
-                status,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(8.dp))
-            AndroidView(
-                modifier = Modifier.fillMaxWidth().weight(1f).clip(MaterialTheme.shapes.large),
-                factory = { ctx ->
-                    WebView(ctx).apply {
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        settings.allowFileAccess = true
-                        settings.allowContentAccess = true
-                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                        webChromeClient = object : WebChromeClient() {
-                            override fun onConsoleMessage(message: ConsoleMessage): Boolean {
-                                if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
-                                    status = "خطأ في الصفحة: " + message.message()
-                                }
-                                return true
-                            }
-                        }
-                        webViewClient = object : WebViewClient() {
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                if (status.startsWith("جارٍ")) status = "تم تحميل الصفحة"
-                            }
-                            override fun onReceivedError(
-                                view: WebView?,
-                                request: WebResourceRequest?,
-                                error: WebResourceError?
-                            ) {
-                                status = if (request?.isForMainFrame == true) {
-                                    "تعذّر تحميل الصفحة: " + error?.description
-                                } else {
-                                    "تعذّر تحميل مكتبة الرسم، تحقق من الإنترنت"
-                                }
-                            }
-                        }
-                        loadDataWithBaseURL("https://eduscan.local/", html, "text/html", "utf-8", null)
-                    }
-                }
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "اسحب للتدوير، واضغط على أي عنصر لمعرفة شرحه.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
+        if (scene == null || scene.objects.isEmpty()) {
             Text("لم يُنشأ نموذج ثلاثي الأبعاد لهذا الدرس.", style = MaterialTheme.typography.bodyLarge)
+            return@Column
         }
+        if (threeSource == null) {
+            Text(
+                "ملف مكتبة الرسم (three.min.js) غير موجود داخل التطبيق.",
+                color = MaterialTheme.colorScheme.error
+            )
+            return@Column
+        }
+
+        val html = remember(lesson.id) { SceneHtml.build(scene, threeSource) }
+
+        Text(
+            status,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(8.dp))
+        AndroidView(
+            modifier = Modifier.fillMaxWidth().weight(1f).clip(MaterialTheme.shapes.large),
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    webChromeClient = object : WebChromeClient() {
+                        override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                            if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+                                status = "خطأ في الصفحة: " + message.message()
+                            }
+                            return true
+                        }
+                    }
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            if (status.startsWith("جارٍ")) status = "تم تحميل المشهد"
+                        }
+                        override fun onReceivedError(
+                            view: WebView?,
+                            request: WebResourceRequest?,
+                            error: WebResourceError?
+                        ) {
+                            status = if (request?.isForMainFrame == true) {
+                                "تعذّر تحميل الصفحة: " + error?.description
+                            } else {
+                                "تعذّر تحميل جزء من الصفحة: " + error?.description
+                            }
+                        }
+                    }
+                    loadDataWithBaseURL("https://eduscan.local/", html, "text/html", "utf-8", null)
+                }
+            }
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "اسحب للتدوير، واضغط على أي عنصر لمعرفة شرحه.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
