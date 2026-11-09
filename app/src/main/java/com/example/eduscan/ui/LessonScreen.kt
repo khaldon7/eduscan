@@ -147,7 +147,7 @@ private fun ModelTab(lesson: Lesson) {
             factory = { ctx ->
                 WebView(ctx).apply {
                     settings.javaScriptEnabled = true
-                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    setBackgroundColor(android.graphics.Color.parseColor("#F5F4EF"))
                     webChromeClient = object : WebChromeClient() {
                         override fun onConsoleMessage(message: ConsoleMessage): Boolean {
                             val text = message.message()
