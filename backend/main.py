@@ -3,17 +3,24 @@ import json
 import os
 import uuid
 
+import requests
 from fastapi import FastAPI, HTTPException
 from google import genai
 from google.genai import types
 from pydantic import BaseModel
 
-# قائمة النماذج بالترتيب، والخادم ينتقل للتالي عند نفاد الحصة أو الازدحام
-MODELS = [m.strip() for m in os.getenv(
+GEMINI_MODELS = [m.strip() for m in os.getenv(
     "GEMINI_MODELS",
     "gemini-2.5-flash,gemini-2.0-flash,gemini-flash-latest"
 ).split(",") if m.strip()]
 
+# نماذج OpenRouter المجانية التي تقرأ الصور، تُجرَّب بالترتيب
+OPENROUTER_MODELS = [m.strip() for m in os.getenv(
+    "OPENROUTER_MODELS",
+    "google/gemma-3-27b-it:free,meta-llama/llama-4-maverick:free"
+).split(",") if m.strip()]
+
+OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY", "")
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 app = FastAPI()
 
@@ -54,33 +61,67 @@ def parse_json(text: str) -> dict:
     return json.loads(cleaned)
 
 
-def generate_with_fallback(image_bytes: bytes, mime_type: str) -> str:
-    last_error = None
-    for model in MODELS:
+def try_gemini(image_bytes: bytes, mime_type: str) -> str:
+    last = None
+    for model in GEMINI_MODELS:
         try:
             response = client.models.generate_content(
                 model=model,
-                contents=[
-                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-                    PROMPT,
-                ],
+                contents=[types.Part.from_bytes(data=image_bytes, mime_type=mime_type), PROMPT],
                 config=types.GenerateContentConfig(response_mime_type="application/json"),
             )
             return response.text
         except Exception as e:
-            last_error = e
-            message = str(e)
-            # ننتقل للنموذج التالي فقط عند نفاد الحصة أو الازدحام أو عدم توفر النموذج
-            if any(code in message for code in ("429", "503", "404", "RESOURCE_EXHAUSTED", "UNAVAILABLE", "NOT_FOUND")):
+            last = e
+            continue
+    raise RuntimeError(f"Gemini: {last}")
+
+
+def try_openrouter(image_bytes: bytes, mime_type: str) -> str:
+    if not OPENROUTER_KEY:
+        raise RuntimeError("OPENROUTER_API_KEY غير مضبوط")
+    image_url = f"data:{mime_type};base64,{base64.b64encode(image_bytes).decode()}"
+    last = None
+    for model in OPENROUTER_MODELS:
+        try:
+            r = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {OPENROUTER_KEY}"},
+                json={
+                    "model": model,
+                    "messages": [{
+                        "role": "user",
+                        "content": [
+                            {"type": "image_url", "image_url": {"url": image_url}},
+                            {"type": "text", "text": PROMPT},
+                        ],
+                    }],
+                },
+                timeout=120,
+            )
+            if r.status_code != 200:
+                last = f"{model}: {r.status_code} {r.text[:200]}"
                 continue
-            raise
-    raise HTTPException(status_code=503, detail=f"جميع النماذج غير متاحة حالياً: {last_error}")
+            return r.json()["choices"][0]["message"]["content"]
+        except Exception as e:
+            last = f"{model}: {e}"
+            continue
+    raise RuntimeError(f"OpenRouter: {last}")
 
 
 @app.post("/analyze")
 def analyze(req: AnalyzeRequest):
     image_bytes = base64.b64decode(req.imageBase64)
-    text = generate_with_fallback(image_bytes, req.mimeType)
+    errors = []
+    text = None
+    for provider in (try_gemini, try_openrouter):
+        try:
+            text = provider(image_bytes, req.mimeType)
+            break
+        except Exception as e:
+            errors.append(str(e))
+    if text is None:
+        raise HTTPException(status_code=503, detail=" | ".join(errors))
     try:
         data = parse_json(text)
     except (json.JSONDecodeError, TypeError):
