@@ -1,6 +1,10 @@
 package com.example.eduscan.ui
 
 import android.graphics.BitmapFactory
+import android.webkit.ConsoleMessage
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.Image
@@ -111,17 +115,51 @@ private fun LessonBody(lesson: Lesson) {
 @Composable
 private fun ModelTab(lesson: Lesson) {
     val scene = lesson.scene
+    var status by remember { mutableStateOf("جارٍ تحميل المشهد...") }
+
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         if (scene != null && scene.objects.isNotEmpty()) {
             val html = remember(lesson.id) { SceneHtml.build(scene) }
+            Text(
+                status,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
             AndroidView(
                 modifier = Modifier.fillMaxWidth().weight(1f).clip(MaterialTheme.shapes.large),
                 factory = { ctx ->
                     WebView(ctx).apply {
                         settings.javaScriptEnabled = true
-                        webViewClient = WebViewClient()
-                        setBackgroundColor(0)
-                        loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+                        settings.domStorageEnabled = true
+                        settings.allowFileAccess = true
+                        settings.allowContentAccess = true
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        webChromeClient = object : WebChromeClient() {
+                            override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                                if (message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+                                    status = "خطأ في الصفحة: " + message.message()
+                                }
+                                return true
+                            }
+                        }
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                if (status.startsWith("جارٍ")) status = "تم تحميل الصفحة"
+                            }
+                            override fun onReceivedError(
+                                view: WebView?,
+                                request: WebResourceRequest?,
+                                error: WebResourceError?
+                            ) {
+                                status = if (request?.isForMainFrame == true) {
+                                    "تعذّر تحميل الصفحة: " + error?.description
+                                } else {
+                                    "تعذّر تحميل مكتبة الرسم، تحقق من الإنترنت"
+                                }
+                            }
+                        }
+                        loadDataWithBaseURL("https://eduscan.local/", html, "text/html", "utf-8", null)
                     }
                 }
             )
