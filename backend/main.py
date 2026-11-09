@@ -23,10 +23,12 @@ PROMPT = """أنت معلم خبير. حلّل صفحة الدرس في الصو
 {
   "title": "عنوان الدرس",
   "summary": "ملخص من 2 إلى 3 جمل",
+  "topic": "heart أو none",
   "sections": [{"heading": "عنوان فرعي", "body": "شرح علمي واضح"}],
   "hotspots": [{"x": 0.0, "y": 0.0, "label": "اسم الجزء", "explanation": "وظيفته وشرحه"}],
   "quiz": [{"question": "سؤال", "options": ["أ", "ب", "ج", "د"], "answerIndex": 0}]
 }
+قاعدة الموضوع: اكتب "heart" إذا كان الدرس عن القلب أو أجزائه، وإلا اكتب "none".
 قواعد النقاط الساخنة: x و y نسبيان بين 0 و 1 من عرض الصورة وارتفاعها، وتشير إلى مركز الجزء أو المصطلح المرسوم.
 اجعل 3 إلى 6 نقاط ساخنة و3 أسئلة اختبار."""
 
@@ -46,5 +48,6 @@ def analyze(req: AnalyzeRequest):
         data = json.loads(response.text)
     except (json.JSONDecodeError, TypeError):
         raise HTTPException(status_code=502, detail="الرد ليس JSON صالحاً")
+    data.setdefault("topic", "none")
     data["id"] = str(uuid.uuid4())
     return data
