@@ -151,7 +151,7 @@ fun LessonCard(lesson: Lesson, onClick: () -> Unit) {
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                if (lesson.topic == "heart") {
+                  if (lesson.scene?.objects?.isNotEmpty() == true) {
                     Spacer(Modifier.height(10.dp))
                     AssistChip(onClick = {}, label = { Text("يتضمن نموذجاً ثلاثي الأبعاد") })
                 }
