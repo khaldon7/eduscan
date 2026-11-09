@@ -7,6 +7,7 @@ data class Lesson(
     val id: String,
     val title: String,
     val summary: String = "",
+    val topic: String = "none",
     val sections: List<Section> = emptyList(),
     val hotspots: List<Hotspot> = emptyList(),
     val quiz: List<QuizQuestion> = emptyList(),
