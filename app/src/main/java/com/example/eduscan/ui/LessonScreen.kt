@@ -109,8 +109,10 @@ private fun LessonBody(lesson: Lesson) {
 
 @Composable
 private fun ModelTab(lesson: Lesson) {
+    val scene = lesson.scene
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        if (lesson.topic == "heart") {
+        if (scene != null && scene.objects.isNotEmpty()) {
+            val html = remember(lesson.id) { SceneHtml.build(scene) }
             AndroidView(
                 modifier = Modifier.fillMaxWidth().weight(1f).clip(MaterialTheme.shapes.large),
                 factory = { ctx ->
@@ -118,58 +120,18 @@ private fun ModelTab(lesson: Lesson) {
                         settings.javaScriptEnabled = true
                         webViewClient = WebViewClient()
                         setBackgroundColor(0)
-                        loadDataWithBaseURL(null, HeartModel.HTML, "text/html", "utf-8", null)
+                        loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
                     }
                 }
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "اسحب للتدوير، واضغط على أي جزء لمعرفة وظيفته.",
+                "اسحب للتدوير، واضغط على أي عنصر لمعرفة شرحه.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            Text(
-                "لا يوجد نموذج ثلاثي الأبعاد لهذا الموضوع بعد.",
-                style = MaterialTheme.typography.bodyLarge
-            )
-        }
-    }
-}
-
-@Composable
-private fun QuizTab(lesson: Lesson) {
-    val answers = remember { mutableStateMapOf<Int, Int>() }
-
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-        if (lesson.quiz.isEmpty()) {
-            Text("لا يوجد اختبار لهذا الدرس.", style = MaterialTheme.typography.bodyLarge)
-        }
-        lesson.quiz.forEachIndexed { qi, q ->
-            Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(q.question, style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(8.dp))
-                    q.options.forEachIndexed { oi, opt ->
-                        Row(
-                            Modifier.fillMaxWidth().clickable { answers[qi] = oi },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(selected = answers[qi] == oi, onClick = null)
-                            Text(opt)
-                        }
-                    }
-                    answers[qi]?.let { given ->
-                        Spacer(Modifier.height(4.dp))
-                        val correct = given == q.answerIndex
-                        Text(
-                            if (correct) "إجابة صحيحة" else "إجابة خاطئة",
-                            color = if (correct) Color(0xFF1D9E75) else MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    }
-                }
-            }
+            Text("لم يُنشأ نموذج ثلاثي الأبعاد لهذا الدرس.", style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
