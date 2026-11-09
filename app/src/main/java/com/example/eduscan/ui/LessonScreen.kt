@@ -11,7 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,7 +20,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -38,7 +37,9 @@ fun LessonScreen(lesson: Lesson, onBack: () -> Unit) {
             TopAppBar(
                 title = { Text(lesson.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "رجوع") }
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع")
+                    }
                 }
             )
         }
@@ -132,6 +133,43 @@ private fun ModelTab(lesson: Lesson) {
             )
         } else {
             Text("لم يُنشأ نموذج ثلاثي الأبعاد لهذا الدرس.", style = MaterialTheme.typography.bodyLarge)
+        }
+    }
+}
+
+@Composable
+private fun QuizTab(lesson: Lesson) {
+    val answers = remember { mutableStateMapOf<Int, Int>() }
+
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+        if (lesson.quiz.isEmpty()) {
+            Text("لا يوجد اختبار لهذا الدرس.", style = MaterialTheme.typography.bodyLarge)
+        }
+        lesson.quiz.forEachIndexed { qi, q ->
+            Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(q.question, style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(8.dp))
+                    q.options.forEachIndexed { oi, opt ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { answers[qi] = oi },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = answers[qi] == oi, onClick = null)
+                            Text(opt)
+                        }
+                    }
+                    answers[qi]?.let { given ->
+                        Spacer(Modifier.height(4.dp))
+                        val correct = given == q.answerIndex
+                        Text(
+                            if (correct) "إجابة صحيحة" else "إجابة خاطئة",
+                            color = if (correct) Color(0xFF1D9E75) else MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+            }
         }
     }
 }
