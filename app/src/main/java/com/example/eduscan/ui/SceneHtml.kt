@@ -3,13 +3,14 @@ package com.example.eduscan.ui
 import com.example.eduscan.model.Scene
 import kotlinx.serialization.json.Json
 
-/** يحوّل وصف المشهد إلى صفحة Three.js تُعرض داخل WebView. */
+/** يحوّل وصف المشهد ومكتبة Three.js المضمّنة إلى صفحة تُعرض داخل WebView بدون إنترنت. */
 object SceneHtml {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
-    fun build(scene: Scene): String {
+    fun build(scene: Scene, threeSource: String): String {
         val data = json.encodeToString(Scene.serializer(), scene).replace("</", "<\\/")
-        return TEMPLATE.replace("__SCENE__", data)
+        val three = threeSource.replace("</script", "<\\/script")
+        return TEMPLATE.replace("__SCENE__", data).replace("__THREE__", three)
     }
 
     private const val TEMPLATE = """
@@ -29,7 +30,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:transparent;font-famil
 <body>
 <div id="msg">جارٍ تحميل المشهد...</div>
 <div id="info"><b>اضغط على أي عنصر</b></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>__THREE__</script>
 <script>
 var SCENE = __SCENE__;
 function init() {
@@ -135,7 +136,7 @@ function init() {
   frame();
 }
 if (typeof THREE === "undefined") {
-  document.getElementById("msg").textContent = "تعذّر تحميل مكتبة الرسم. تحقق من الإنترنت.";
+  document.getElementById("msg").textContent = "تعذّر تحميل مكتبة الرسم داخل التطبيق.";
 } else {
   init();
 }
