@@ -16,7 +16,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1"
-        buildConfigField("String", "BASE_URL", "\"https://your-backend.example.com/\"")
+        buildConfigField("String", "BASE_URL", "\"https://eduscan-api-ehci.onrender.com/\"")
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
@@ -39,5 +39,4 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("com.google.mlkit:text-recognition:16.0.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
-}
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play
